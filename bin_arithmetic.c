@@ -3,7 +3,7 @@
 
 typedef const char *string;
 
-// Utility: function to reverse a string in place
+// utility: to reverse a string in place
 void revstr(char *str, size_t n) {
   for (size_t i = 0; i < n / 2; ++i) {
     char tmp = str[i];
@@ -12,10 +12,10 @@ void revstr(char *str, size_t n) {
   }
 }
 
-// Utility: function to compare binary strings without converting to Integer
+// utility: to compare binary strings without converting to integers
 int BinCmp(string a, string b) {
   while (*a == '0')
-    ++a; // strip leading 0s
+    ++a;
   while (*b == '0')
     ++b;
 
@@ -31,10 +31,10 @@ void BinAdd(string b1, string b2, char *result) {
   int k = 0, carry = 0;
 
   while (i >= 0 || j >= 0 || carry) {
-    int bit1 = (i >= 0) ? (b1[i--] - '0') : 0;
-    int bit2 = (j >= 0) ? (b2[j--] - '0') : 0;
+    int d1 = (i >= 0) ? (b1[i--] - '0') : 0;
+    int d2 = (j >= 0) ? (b2[j--] - '0') : 0;
 
-    int sum = bit1 + bit2 + carry;
+    int sum = d1 + d2 + carry;
     result[k++] = (sum % 2) + '0';
     carry = sum / 2;
   }
@@ -48,35 +48,34 @@ void BinSub(string b1, string b2, char *result) {
   int k = 0, borrow = 0;
 
   while (i >= 0 || j >= 0) {
-    int bit1 = (i >= 0) ? (b1[i--] - '0') : 0;
-    int bit2 = (j >= 0) ? (b2[j--] - '0') : 0;
+    int d1 = (i >= 0) ? (b1[i--] - '0') : 0;
+    int d2 = (j >= 0) ? (b2[j--] - '0') : 0;
 
-    bit1 -= borrow;
-    if (bit1 < bit2) {
-      bit1 += 2;
+    d1 -= borrow;
+    if (d1 < d2) {
+      d1 += 2;
       borrow = 1;
     } else {
       borrow = 0;
     }
-    result[k++] = (bit1 - bit2) + '0';
+    result[k++] = (d1 - d2) + '0';
   }
 
   // remove leading 0s
   while (k - 1 > 0 && result[k - 1] == '0')
     --k;
-
   result[k] = '\0';
+
   revstr(result, k);
 }
 
 void BinMul(string b1, string b2, char *result) {
-  int n = strlen(b1);
-  int i = strlen(b2) - 1;
   char temp[100] = "0";
+  int n = strlen(b1);
   int shift = 0;
 
-  while (i >= 0) {
-    if (b2[i--] == '1') {
+  for (int i = strlen(b2) - 1; i >= 0; --i) {
+    if (b2[i] == '1') {
       char shifted[100];
       strcpy(shifted, b1);
       for (int s = 0; s < shift; ++s)
@@ -84,15 +83,14 @@ void BinMul(string b1, string b2, char *result) {
       shifted[n + shift] = '\0';
 
       BinAdd(temp, shifted, result);
-      printf("%s\n", result);
       strcpy(temp, result);
     }
     ++shift;
   }
-  strcpy(result, temp);
 }
 
-void BinDiv(string dividend, string divisor, char *quotient, char *remainder) {
+void BinDivMod(string dividend, string divisor, char *quotient,
+               char *remainder) {
   char current[100];
   current[0] = '\0';
   quotient[0] = '\0';
@@ -112,35 +110,32 @@ void BinDiv(string dividend, string divisor, char *quotient, char *remainder) {
   }
 
   // update remainder
-  strcpy(remainder, current);
-
-  // remove leading 0s from quotient
   int s = 0;
+  while (current[s] == '0')
+    ++s;
+  strcpy(remainder, current + s);
+
+  // remove leading 0s
+  s = 0;
   while (quotient[s] == '0' && quotient[s + 1] != '\0')
     ++s;
   memmove(quotient, quotient + s, strlen(quotient + s) + 1);
 }
 
 int main(void) {
-  char result[100], remainder[100];
+  char result[100], rem[100];
 
-  BinAdd("10110", "1111", result); // 22 + 15
-  printf("%s\n", result);          // 37
+  BinAdd("110111", "101101", result); // 55 + 45
+  printf("%s\n", result);             // 100
 
-  BinSub("10110", "1111", result); // 22 - 15
-  printf("%s\n", result);          // 7
+  BinSub("110111", "101101", result); // 55 - 45
+  printf("%s\n", result);             // 10
 
-  BinMul("10110", "1111", result); // 22 * 15
-  printf("%s\n", result);          // 330
+  BinMul("1111", "1010", result); // 15 x 10
+  printf("%s\n", result);         // 150
 
-  BinDiv("10110", "11", result, remainder); // 22 / 3
-  printf("%s and %s\n", result, remainder); // 7  1
-
-  BinDiv("10110", "1010", result, remainder); // 22 / 10
-  printf("%s and %s\n", result, remainder);   // 2  2
-
-  BinDiv("10110", "10110", result, remainder); // 22 / 22
-  printf("%s and %s\n", result, remainder);    // 1  0
+  BinDivMod("1110011", "111", result, rem); // 115 / 7
+  printf("%s and %s\n", result, rem);       // 16 and 3
 
   return 0;
 }
