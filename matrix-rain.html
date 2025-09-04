@@ -1,0 +1,67 @@
+<body>
+  <canvas></canvas>
+</body>
+
+<style>
+  *{
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+  }
+</style>
+
+<script>
+  const canvas = document.querySelector('canvas')
+  const ctx = canvas.getContext('2d')
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+  
+  let gradient = ctx.createLinearGradient(0,0,canvas.width,canvas.height)
+  gradient.addColorStop(0, 'red')
+  gradient.addColorStop(0.2, 'yellow')
+  gradient.addColorStop(0.4, 'green')
+  gradient.addColorStop(0.6, 'cyan')
+  gradient.addColorStop(0.8, 'blue')
+  gradient.addColorStop(1, 'magenta')
+
+  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const fontSize = 25
+  let columns = Math.round(canvas.width / fontSize)
+
+  let lastTime = 0
+  const fps = 30
+  const interval = 1000 / fps
+
+  let drops = Array(columns).fill(0)
+  function draw(timestamp){
+      if (timestamp - lastTime > interval){
+	  lastTime = timestamp
+	  
+	  ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
+	  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+	  ctx.fillStyle = gradient  // green
+	  ctx.font = fontSize + "px monospace"
+
+	  for (let i=0; i<drops.length; ++i){
+	      const text = chars[Math.floor(Math.random()*chars.length)]
+	      const x = i * fontSize
+	      const y = drops[i] * fontSize
+	      ctx.fillText(text, x, y)
+
+	      drops[i]++
+	      if (y > canvas.height && Math.random() > 0.95) drops[i] = 0
+	  }
+      }
+
+      requestAnimationFrame(draw)
+  }
+  draw()
+
+  window.addEventListener('resize', () => {
+      canvas.width = innerWidth
+      canvas.height = innerHeight
+      columns = Math.round(canvas.width / fontSize)
+      drops = Array(columns).fill(0)
+  })
+</script>

@@ -1,0 +1,145 @@
+* Creating Matrix Rain in Javascript
+
+     *Full Code*: [[file:./code/webdev/matrix-rain.html]]
+     We will use *canvas* to create this Matrix Rain
+     #+BEGIN_SRC html
+       <canvas></canvas>
+     #+END_SRC
+
+     a little bit of styling
+     #+BEGIN_SRC css
+       * {
+           padding: 0;
+           margin: 0;
+           box-sizing: border-box;
+        }
+     #+END_SRC
+
+     lets set up the canvas, set canvas width and height to page
+     #+BEGIN_SRC js
+       const canvas = document.querySelector('canvas')
+       const ctx = canvas.getContext('2d')
+       ctx.width = window.innerWidth
+       ctx.height = window.innerHeight
+     #+END_SRC
+     
+     Let's draw text in canvas
+     - white 48px monospace 'A'
+     - draws 'A' in x: 100 and y: 100
+     #+BEGIN_SRC js
+       ctx.fillStyle = "white"
+       ctx.font = "48px monospace"
+       ctx.fillText("A", 100, 100)
+     #+END_SRC
+
+     Now let's draw a horizontal line of characters consisting of random characters
+     - ~chars~ is where all our characters which we will use in matrix lie
+     - ~columns~ represent number of character that can come in line respective to width of page
+     - Then in ~ch~ we randomly select 1 character from chars
+     - Finally ~ctx.fillText~ puts ch in position x, y
+     #+BEGIN_SRC js
+       const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+       const fontSize = 20
+       let columns = Math.round(canvas.width / fontSize)
+
+       ctx.fillStyle = 'green'
+       ctx.font = fontSize + "px monospace"
+
+       for (let i=0; i<columns; ++i){
+           const ch = chars[Math.floor(Math.random() * chars.length)]
+           const x = i * fontSize
+           const y = fontSize
+           ctx.fillText(ch, x, y)
+       }
+     #+END_SRC
+     
+
+     Okay now lets actually create the complete matrix
+     - We create ~drops~ array of size ~columns~ and set it to 0
+     - ~y~ position is important initially ~drops[i]~ is 0 so ~y~ starts with 0
+     - then we update ~drops[i]++~ and this how how we set y coordinate for next ~text~ element to be drawn
+     - Finally we check if ~y > canvas.height~ then we reset ~drops[i] = 0~
+     #+BEGIN_SRC js
+       let drops = Array(columns).fill(0)
+       
+       function draw(){
+           ctx.fillStyle = "green"
+           ctx.font = fontSize + "px monospace"
+
+           for (let i=0; i<drops.length; ++i){
+       	const text = chars[Math.floor(Math.random()*chars.length)]
+       	const x = i * fontSize
+       	const y = drops[i] * fontSize
+       	ctx.fillText(text, x, y)
+
+       	drops[i]++
+       	if (y > canvas.height) drops[i] = 0
+           }
+
+           requestAnimationFrame(draw)
+       }
+       draw()
+     #+END_SRC
+
+     It's cool but not pretty, lets add a fading background effect so it feels like its falling down
+     #+BEGIN_SRC js
+       function draw(){
+           ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
+           ctx.fillRect(0, 0, canvas.width, canvas.height)
+           ...
+       }
+     #+END_SRC
+
+     Okay cool another thing is all the columns falls at same time not cool
+     Lets make them fall at different time so it looks more realistic
+     #+BEGIN_SRC js
+       if (y > canvas.height && Math.random() > 0.95) drops[i] = 0
+     #+END_SRC
+
+     - Its too fast we need to set up some sort of Frame Rate
+     - We are using ~requestAnimationFrame(draw)~ the browser tries to call ~draw~ *as fast as your monitor's refresh rate* (usually ~60 fps)
+     - This means ~60 times per second, your function would run, which can be too fast
+     - ~timestamp~ is provided by ~requestAnimationFrame~, It's the time (in ms) since the page started.
+     - ~timestamp - lastTime~ tells you *how much time passed since the last frame you actually drew*
+     - If it's bigger than ~interval~ (50ms), then you run the drawing code
+     #+BEGIN_SRC js
+       let lastTime = 0
+       const fps = 30
+       const interval = 1000 / fps
+
+       function draw(timestamp){
+           if (timestamp - lastTime > interval){
+       	  lastTime = timestamp
+       	  ...
+           }
+           requestAnimationFrame(draw)
+       }
+       draw()
+     #+END_SRC
+
+     We are done for a sugar on top let add gradient colors
+     - We create gradient of the size of canvas
+     - The at 0% - red, 20% - yellow at 100% - magenta and so on
+     #+BEGIN_SRC js
+       let gradient = ctx.createLinearGradient(0,0,canvas.width,canvas.height)
+       gradient.addColorStop(0, 'red')
+       gradient.addColorStop(0.2, 'yellow')
+       gradient.addColorStop(0.4, 'green')
+       gradient.addColorStop(0.6, 'cyan')
+       gradient.addColorStop(0.8, 'blue')
+       gradient.addColorStop(1, 'magenta')
+
+       function draw(timestamp){
+           ctx.fillStyle = gradient  // green
+       }
+     #+END_SRC
+
+     Color looks cool beautiful, finally lets make it fill screen on window resize
+     #+BEGIN_SRC js
+       window.addEventListener('resize', () => {
+           canvas.width = innerWidth
+           canvas.height = innerHeight
+           columns = Math.round(canvas.width / fontSize)
+           drops = Array(columns).fill(0)
+       })
+     #+END_SRC

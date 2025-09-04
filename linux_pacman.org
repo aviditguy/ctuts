@@ -1,0 +1,160 @@
+* A Guide to Pacman package manager
+
+    - *Pacman* (Package Manager) is the default package manager for Arch Linux and derivatives (Manjaro, EndeavourOS, etc.).
+    - Written in *C*, very fast, and uses a simple *binary package format (.pkg.tar.zst)*.
+    - Combines:
+      - Binary package installation/removal (~apt~, ~dnf~ style).
+      - Package building from source (via *PKGBUILD* + ~makepkg~).
+    - Uses *libalpm* (Arch Linux Package Management library) internally.
+
+    *Package Sources*
+    - Official Repositories:
+      - ~core~: essential system packages.
+      - ~extra~: general software (editors, browsers, etc.).
+      - ~community~: community-maintained.
+      - ~multilib~: 32-bit libraries.
+    - *AUR* (Arch User Repository): community-driven repo for user-contributed packages (needs ~yay~, ~paru~, or manual ~makepkg~).
+
+       | *Updating Command*                  | *Description*                                 |
+       |-----------------------------------+---------------------------------------------|
+       | sudo pacman -Syu                  | Sync repos + refresh DB + upgrade system    |
+       | sudo pacman -Syyu                 | Force refresh all DBs (rarely needed)       |
+       |                                   |                                             |
+       | *Installing Command*                |                                             |
+       |-----------------------------------+---------------------------------------------|
+       | sudo pacman -S firefox mpv neovim | Install Package(s)                          |
+       |                                   |                                             |
+       | *Removing Command*                  |                                             |
+       |-----------------------------------+---------------------------------------------|
+       | sudo pacman -R <pkg>              | Remove package only                         |
+       | sudo pacman -Rs <pkg>             | Remove package + unused deps                |
+       | sudo pacman -Rns <pkg>            | Remove package + unused deps + config files |
+       |                                   |                                             |
+       | *Searching Command*                 |                                             |
+       |-----------------------------------+---------------------------------------------|
+       | pacman -Ss <pkg>                  | Search in repositories                      |
+       | pacman -Qs <pkg>                  | Search installed packages                   |
+       |                                   |                                             |
+       | *Querying Command*                  |                                             |
+       |-----------------------------------+---------------------------------------------|
+       | pacman -Qi <pkg>                  | Info about installed pkg                    |
+       | pacman -Si <pkg>                  | Info about repo pkg                         |
+       | pacman -Q                         | List installed packages                     |
+       | pacman -Qe                        | List explicitly installed                   |
+       | pacman -Qd                        | List dependencies                           |
+       | pacman -Qdt                       | List orphaned packages                      |
+       |                                   |                                             |
+       | *Cleaning Cache Command*            |                                             |
+       |-----------------------------------+---------------------------------------------|
+       | sudo pacman -Sc                   | Remove old package versions, keep current   |
+       | sudo pacman -Scc                  | Remove All cached packages (careful!)       |
+       
+
+***** Advanced Usage
+
+****** 1. Partial Upgrades (⚠️ Avoid)
+        Arch is a *rolling release* → partial upgrades break system.
+	Always update everything together ~sudo pacman -Syu~
+	
+****** 2. Downgrading Packages
+        Pacman doesn't handle downgrade automatically, but cached packages are in: =/var/cache/pacman/pkg/=
+	So we can Install Local Package like: ~sudo pacman -U /var/cache/pacman/pkg/<package-old.pkg.tar.zst>~
+	
+****** 3. Package Groups
+
+        | *Command*                  | *Description*               |
+        |--------------------------+---------------------------|
+        | pacman -S gnome          | Installs full GNOME group |
+        | pacman -S gnome --needed | Skip already installed    |
+        | pacman -Sg               | List all groups           |
+        | pacman -Sg <group>       | List packages in group    |
+
+****** 4. Hooks (Automation)
+        Pacman supports *hooks* in =/usr/share.libalpm/hooks/= and =/etc/pacman.d/hooks/=
+	Example: Run ~update-grub~ after kernel upgrade:
+
+	#+BEGIN_SRC bash
+	  # /etc/pacman.d/hooks/90-grub-update.hook
+	  [Trigger]
+	  Operation = Install
+	  Operation = Upgrade
+	  Type = Package
+	  Target = linux
+
+	  [Action]
+	  Description = Updating GRUB...
+	  When = PostTransaction
+	  Exec = /usr/bin/grub-mkconfig -o /boot/grub/grub.cfg
+	#+END_SRC
+	
+****** 5. Config File: =/etc/pacman.conf=
+        - Controls pacman behavior:
+	  - ~HoldPkg~ → Prevent removal of critical pkgs.
+	  - ~IgnorePkg~ → Never upgrade specific pkgs.
+	  - ~Color~, ~VerbosePkgLists~, ~ILoveCandy~ (fun rainbow progress bar).
+
+	*Example*:
+	#+BEGIN_SRC bash
+	  [options]
+	  Color
+	  VerbosePkgLists
+	  ParallelDownloads = 5
+	#+END_SRC
+
+****** 6. Pacman Internals
+        - *libalpm* handles backend.
+	- Database location: =/var/lib/pacman/=
+	- Cache location: =/var/cache/pacman/pkg/=
+	- Package format: ~.pkg.tar.zst~
+
+	  Internally just a *tar archive* with:
+	  #+BEGIN_SRC bash
+	    .PKGINFO   # Metadata
+	    .INSTALL   # (optional) install script
+	    usr/...
+	    etc/...
+	  #+END_SRC
+
+	  You can extract:
+	  #+BEGIN_SRC bash
+	    tar -I zstd -xvf pkgname.pkg.tar.zst
+	  #+END_SRC
+
+****** 7. Debugging and Logs
+        - Logs: =/var/log/pacman.log=
+	- Check what happened during upgrade/downgrade.
+	- Dry-run installs: ~pacman -S --print <pkg>~
+
+****** 8. Pacman Tricks
+        - Check which package owns a file: ~pacman -Qo /usr/bin/vim~
+	- List files installed by package: ~pacman -Ql vim~
+	- Remove orphans (safe cleanup): ~sudo pacman -Rns $(pacman -Qdtq)~
+	- Upgrade system except one package: ~sudo pacman -Syu --ignore-linux~
+	
+****** 9. Pacman Alternatives and Helpers
+        - *yay/paru* → Extend pacman for *AUR* packages.
+	- Syntax stays same as pacman but supports AUR.
+
+	Example with yay: ~yay -S brave-bin~ or ~yay -Rns brave-bin~
+	
+****** 10. Pacman Workflow for a New Arch Install
+        #+BEGIN_SRC bash
+	  # Step 1: Update System
+	  sudo pacman -Syu
+
+	  # Step 2: Install base packages
+	  sudo pacman -S base-devel git
+
+	  # Step 3: Enable multilib (edit /etc/pacman.conf)
+	  # Uncomment
+	  # [multilib]
+	  # Include = /etc/pacman.d/mirrorlist
+
+	  # Step 4: Install desktop, drivers, apps
+	  sudo pacman -S xorg plasma firefox
+	#+END_SRC
+	
+****** 11. Pacman Recovery
+        - If pacman breaks:
+	  - Use *chroot* from Arch ISO: ~arch-chroot /mnt~ then ~pacman -Syu~
+	  - Reinstall pcaman: ~pacman -S pacman~
