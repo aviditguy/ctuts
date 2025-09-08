@@ -1,0 +1,674 @@
+* A Guide to ~pkg-config~
+
+** 1. What is ~pkg-config~?
+- A helper tool that provides necessary compiler (CFLAGS) and linker (LIBS) flags for building applications using external libraries.
+- It queries .pc metadata files—human-readable files describing library paths and versions—to automate build processes.
+- Language-agnostic, available on Linux, macOS, BSD, Windows, and more.
+
+
+** 2. How it Works: ~.pc~ Files
+A typical *.pc* file (e.g., for *libpng*) looks like:
+#+BEGIN_SRC makefile
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${exec_prefix}/include
+
+Name: libpng
+Description: PNG image library
+Version: 1.2.8
+Libs: -L${libdir} -lpng12 -lz
+Cflags: -I${includedir}/libpng12
+#+END_SRC
+
+When you run: ~gcc main.c $(pkg-config --libs --cflags libpng)~
+*pkg-config* injects the correct *flags* from the *.pc* file.
+
+
+** 3. Common Usage Patterns
+| *Task*                        | *Command*                           | *Purpose*                                                               |
+| --------------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| List all available packages | =pkg-config --list-all=             | See all recognized libraries                                          |
+| Show only names             | =--list-package-names=              | Entry names without descriptions                                      |
+| Get compiler flags          | =--cflags libname=                  | E.g., ~-I...~ flags                                                   |
+| Get linker flags            | =--libs libname=                    | E.g., ~-L... -l...~ flags                                             |
+| Check existence             | =--exists libname=                  | Exits 0 if found, >0 if not                                           |
+| Version info                | =--modversion libname=              | Prints installed version                                              |
+| Version check               | =--atleast-version=1.2.3 libname=   | Ensures minimum version                                               |
+| Show *.pc* file path          | =--path libname=                    | Find where ~.pc~ resides                                              |
+| List variables              | =--print-variables libname=         | See defined custom variables                                          |
+| Variable value              | =--variable=var libname=            | E.g., ~libdir~, ~includedir~                                          |
+| Dependency graph            | =--digraph libname=                 | Outputs Graphviz format                                               |
+
+
+** 4. Environment and Search Paths
+By default *pkg-config* searches standard locations like ~/usr/lib/pkgconfig~, ~/usr/share/pkgconfig~, ~/use/local/lib/pkgconfig~, and more.
+You can override or extend that search path with:
+#+BEGIN_SRC shell
+export PKG_CONFIG_PATH=/opt/mylib/lib/pkgconfig:$$PKG_CONFIG_PATH
+#+END_SRC
+
+This helps when libraries are installed in custom directories.
+To view default paths run: 
+#+BEGIN_SRC shell
+pkg-config --variable pc_path pkg-config
+#+END_SRC
+
+
+** 5. Best Practices for ~.pc~ File Authors
+From Collabora’s checklist: [[https://www.collabora.com/about-us/blog/2014/12/09/a-checklist-for-writing-pkg-config-files/]]
+- *Include API version* in ~.pc~ filename (e.g., ~libfoo-1.pc~) to support parallel installations.
+- *Separate public* vs. *private dependencies* using ~Requires~ vs. ~Requires.private~.
+- *Use Autotools* (~AX_PKG_CHECK_MODULES~) to automate version and dependency handling.
+- ~Template~ ~.pc.in~ files, substituting ~@PACKAGE_NAME@~ and other variables to avoid sync issues.
+
+
+** 6. Alternatives to ~pkg-config~
+- *pkgconf* — a lightweight, GLib-free reimplementation that’s default on many distributions (Arch, Debian, Fedora, FreeBSD, etc.).
+  - Supports virtual packages, conflict resolution, and optimized dependency graphs.
+- Other variants: *u-config, ruby-gnome/pkg-config, PkgConfig (Perl)*.
+
+
+** 7. Advanced Tooling
+- *Python integration* via the ~pkgconfig~ module:
+#+BEGIN_SRC python
+import pkgconfig
+pkgconfig.exists('glib-2.0')  # True/False
+pkgconfig.cflags('glib-2.0')
+pkgconfig.libs('glib-2.0')
+#+END_SRC
+
+Useful for setup scripts in Python projects.
+- *Rust/Cargo integration* via the ~pkg-config~ crate, automating library detection during builds.
+
+
+** 8. When to Use ~pkg-config~
+- When your code depends on external libraries.
+- In build systems (*Make, CMake, Meson, etc.*) to avoid manual path edits.
+- In installers or cross-platform projects to ensure correct library usage regardless of environment.
+
+*Quick Workflow Example:*
+#+BEGIN_SRC shell
+# Check if libssl is available
+pkg-config --exists openssl && echo "SSL found!" || echo "SSL missing!"
+
+# Get flags
+CFLAGS=$(pkg-config --cflags openssl)
+LIBS=$(pkg-config --libs openssl)
+
+# Compile
+gcc $CFLAGS -o myapp myapp.c $LIBS
+#+END_SRC
+
+
+
+* A Guide to ~makepkg~
+
+** 1. What is ~makepkg~?
+- Normally, you write *Makefiles* or use *gcc* directly to build C programs.
+- ~makepkg~ lets you wrap your build into a *distributable Arch Linux package* (~.pkg.tar.zst~) so anyone can install it with ~pacman~.
+- You don’t run it as root — ~makepkg~ uses *fakeroot* so the final package has correct file permissions.
+
+- ~makepkg~ is *Arch-specific* (and Arch-based distributions like *Manjaro, EndeavourOS, etc.*).
+- *A shell script* tool that comes with the ~pacman~ *package manager* on Arch Linux.
+- It is used to *build packages from source* into Arch’s package format (~.pkg.tar.zst~).
+- It works with *PKGBUILDs* (text files describing how to fetch, compile, and package software).
+- The package format (~.pkg.tar.zst~) is *unique to Arch and pacman*.
+- The *PKGBUILD* structure (~pkgname~, ~pkgver~, ~source~, ~build()~, ~package()~, etc.) is defined by *Arch’s packaging standards*.
+- It relies on Arch’s *filesystem hierarchy, toolchain, and pacman hooks*.
+
+
+** 2. Pre-requisites
+#+BEGIN_SRC bash
+sudo pacman -S  --needed base-devel git
+#+END_SRC
+
+- ~base-devel~ includes ~gcc~, ~make~, ~autoconf~, ~automake~, ~binutils~, ~fakeroot~ → everything needed to build C projects.
+- Without this group, *makepkg* builds will usually fail.
+
+
+** 3. Anatomy of a *PKGBUILD* (for C programs)
+*Example:* =hello world= in C
+#+BEGIN_SRC C
+#include <stdio.h>
+int main() {
+    printf("Hello, Arch!\n");
+    return 0;
+}
+#+END_SRC
+
+*PKGBUILD*
+#+BEGIN_SRC bash
+pkgname=hello-arch
+pkgver=1.0
+pkgrel=1
+pkgdesc="Simple hello world in C"
+arch=('x86_64')
+license=('MIT')
+source=("hello.c")
+sha256sums=('SKIP')   # For local sources, skip
+
+build() {
+  gcc "$srcdir/hello.c" -o hello
+}
+
+package() {
+  install -Dm755 hello "$pkgdir/usr/bin/hello"
+}
+#+END_SRC
+
+*Run:* ~makepkg -si~ and now you can run: ~hello~
+
+
+** 4. Key PKGBUILD Variables (C Projects)
+- *depends=(...)* → runtime deps (like ~glibc~, ~openssl~).
+- *makedepends=(...)* → only needed for compilation (like ~cmake~, ~pkg-config~).
+- *arch=('x86_64')* → architecture support.
+- *source=(...)* → tarballs, git repos, or local files.
+- *sha256sums=(...)* → security check (run ~makepkg -g~ to auto-generate).
+
+
+** 5. Important Functions (C Build Flow)
+- *prepare()* → Patch or edit sources before compiling.
+- *build()* → Run ~gcc~, ~make~, or ~cmake~.
+- *check()* → Run test suite (like ~make check~).
+- *package()* → Install into ~$pkgdir~ (the fake root filesystem).
+
+Always install to ~$pkgdir~, not ~/usr~ directly.
+
+
+** 6. Handling Autotools Projects
+Most real-world C projects use ~configure && make~.
+*Example:*
+#+BEGIN_SRC bash
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  ./configure --prefix=/usr
+  make
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  make DESTDIR="$pkgdir" install
+}
+#+END_SRC
+
+
+** 7. Handling CMake Projects
+For CMake-based C libraries or apps:
+#+BEGIN_SRC bash
+makedepends=('cmake')
+
+build() {
+  cmake -B build -S "$srcdir/$pkgname-$pkgver" \
+        -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}
+#+END_SRC
+
+
+** 8. Using ~pkg-config~ in *PKGBUILDs*
+If your C project uses external libraries, declare them properly.
+*Example:* A project using ~openssl~.
+#+BEGIN_SRC bash
+depends=('openssl')
+makedepends=('pkg-config')
+
+build() {
+  gcc hello_ssl.c -o hello_ssl $(pkg-config --cflags --libs openssl)
+}
+#+END_SRC
+
+
+** 9. Testing & Debugging
+- *Dry run build:*
+#+BEGIN_SRC bash
+makepkg -o   # only download/extract sources
+#+END_SRC
+
+- *Force rebuild:*
+#+BEGIN_SRC bash
+makepkg -Lsi
+#+END_SRC
+
+
+** 10. Split Packages (C libs + tools)
+Sometimes you want separate *library* and *tools* packages.
+*Example:*
+- *libfoo.so* → goes in ~libfoo~ package.
+- *foo binary* → goes in ~foo-tools~.
+#+BEGIN_SRC bash
+pkgbase=foo
+pkgname=(libfoo foo-tools)
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=("https://example.com/foo-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/foo-$pkgver"
+  ./configure --prefix=/usr
+  make
+}
+
+package_libfoo() {
+  cd "$srcdir/foo-$pkgver"
+  make DESTDIR="$pkgdir" install
+  rm -rf "$pkgdir/usr/bin"   # keep only libs
+}
+
+package_foo-tools() {
+  cd "$srcdir/foo-$pkgver"
+  install -Dm755 tools/foo "$pkgdir/usr/bin/foo"
+}
+#+END_SRC
+
+
+** 11. Security Best Practices
+- Never run ~makepkg~ as root.
+- Always verify sources (~sha256sums~, ~validpgpkeys~).
+- Use ~pkgrel++~ when repackaging without upstream version change.
+- Don’t hardcode ~/usr~ → always use ~$pkgdir/usr~.
+
+
+** 12. Workflow for C Developers
+1. *Write C code* + Makefile or build system.
+2. *Create PKGBUILD* describing build steps.
+3. Run ~makepkg -si~ → build + install locally.
+4. *Distribute* the ~.pkg.tar.zst~ for others to install via pacman.
+5. (Optional) *Submit to AUR* if public.
+
+
+** 13. Example: *C Project with* ~configure~, ~check~, ~make~
+#+BEGIN_SRC bash
+pkgname=foo
+pkgver=2.3.4
+pkgrel=1
+pkgdesc="Foo library in C"
+arch=('x86_64')
+url="https://foo.org"
+license=('GPL')
+depends=('glibc')
+makedepends=('gcc' 'make' 'pkg-config')
+source=("https://foo.org/releases/$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/$pkgname-$pkgver"
+  patch -p1 < "$srcdir/fix-bug.patch"
+}
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  ./configure --prefix=/usr
+  make
+}
+
+check() {
+  cd "$srcdir/$pkgname-$pkgver"
+  make check
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  make DESTDIR="$pkgdir" install
+}
+#+END_SRC
+
+✅ With this, you can package any C project into a proper Arch package.
+
+
+
+* A Guide to ~pacman~ (Arch Linux Package Manager)
+
+** 1. What is ~pacman~?
+- *pacman (Package Manager)* is the default package manager for Arch Linux and derivatives (Manjaro, EndeavourOS, etc.).
+- *Written in C*, very fast, and uses a simple *binary package format (.pkg.tar.zst)*.
+- Combines:
+  - *Binary package installation/removal* (~apt~, ~dnf~ style).
+  - *Package building from source (via *PKGBUILD* + ~makepkg~).
+- Uses *libalpm* (Arch Linux Package Management library) internally.
+
+
+** 2. Package Sources
+- Official Repositories:
+  - *core:* essential system packages.
+  - *extra:* general software (editors, browsers, etc.).
+  - *community:* community-maintained.
+  - *multilib:* 32-bit libraries.
+- *AUR (Arch User Repository):* community-driven repo for user-contributed packages (needs ~yay~, ~paru~, or manual ~makepkg~).
+
+
+** 3. Basic Commands
+| *Command*                       | *Decsription*                                 |
+|-------------------------------+---------------------------------------------|
+| =Updating=                      |                                             |
+| sudo pacman -Syu              | Sync repos + refresh DB _ upgrade system    |
+| sudo pacman -Syyu             | Force refresh all DBs (rarely needed)       |
+|                               |                                             |
+| =Installing=                    |                                             |
+| sudo pacman -S firefox neovim | Install multiple packages at once           |
+|                               |                                             |
+| =Removing=                      |                                             |
+| sudo pacman -R <pkg>          | Remove package only                         |
+| sudo pacman -Rs <pkg>         | Remove package + unused deps                |
+| sudo pacman -Rns <pkg>        | Remove package + unused deps + config files |
+|                               |                                             |
+| =Searching=                     |                                             |
+| pacman -Ss <pkg>              | Search in repositories                      |
+| pacman -Qs <pkg>              | Search installed packages                   |
+|                               |                                             |
+| =Querying=                      |                                             |
+| pacman -Qi <pkg>              | Info about installed pkg                    |
+| pacman -Si <pkg>              | Info about repo pkg                         |
+| pacman -Q                     | List installed packages                     |
+| pacman -Qe                    | List explicitly installed                   |
+| pacman -Qd                    | List dependencies                           |
+| pacman -Qdt                   | List orphaned packages                      |
+|                               |                                             |
+| =Cleaning Cache=                |                                             |
+| sudo pacman -Sc               | Remove old package versions, keep current   |
+| sudo pacman -Scc              | Remove ALL cached packages *(careful!)*       |
+
+
+** 4. Advanced Usage
+- *Partial Upgrades (⚠️ Avoid)*
+  - Arch is a *rolling release* → partial upgrades break system.
+  - Always update everything together:
+#+BEGIN_SRC bash
+sudo pacman -Syu
+#+END_SRC
+
+- *Downgrading Packages*
+  - Pacman doesn’t handle downgrade automatically, but cached packages are in:
+  - ~/var/cache/pacman/pkg/~
+
+  - *Example:*
+#+BEGIN_SRC bash
+sudo pacman -U /var/cache/pacman/pkg/<package-old.pkg.tar.zst>
+#+END_SRC
+
+- *Install Local Package*
+#+BEGIN_SRC bash
+sudo pacman -U ./my_pkg.pkg.tar.zst
+#+END_SRC
+
+- *Package Groups*
+#+BEGIN_SRC bash
+pacman -S gnome            # Installs full GNOME group
+pacman -S gnome --needed   # Skip already installed
+pacman -Sg                 # List all groups
+pacman -Sg <group>         # List packages in group
+#+END_SRC
+
+
+** 5. Hooks (Automation)
+Pacman supports *hooks* in =/usr/share/libalpm/hooks/= and =/etc/pacman.d/hooks/=.
+*Example:* Run ~update-grub~ after kernel upgrade:
+#+BEGIN_SRC ini
+# /etc/pacman.d/hooks/90-grub-update.hook
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+
+[Action]
+Description = Updating GRUB...
+When = PostTransaction
+Exec = /usr/bin/grub-mkconfig -o /boot/grub/grub.cfg
+#+END_SRC
+
+
+** 6. *Config File*: ~/etc/pacman.conf~
+- Controls pacman behavior:
+  - *HoldPkg* → Prevent removal of critical pkgs.
+  - *IgnorePkg* → Never upgrade specific pkgs.
+  - *Color, VerbosePkgLists, ILoveCandy* (fun rainbow progress bar).
+
+*Example*
+#+BEGIN_SRC ini
+[options]
+Color
+VerbosePkgLists
+ParallelDownloads = 5
+#+END_SRC
+
+
+** 7. Pacman Internals
+- *libalpm* handles backend.
+- Database location: =/var/lib/pacman/=
+- Cache location: =/var/cache/pacman/pkg/=
+- Package format: ~.pkg.tar.zst~
+
+Internally just a *tar archive* with:
+#+BEGIN_SRC bash
+.PKGINFO   # Metadata
+.INSTALL   # (optional) install script
+usr/...
+etc/...
+#+END_SRC
+
+You can extract: ~tar -I zstd -xvf pkgname.pkg.tar.zst~
+
+
+** 8. Debugging & Logs
+- Logs: =/var/log/pacman.log=
+- Check what happened during upgrade/downgrade.
+- Dry-run installs: ~pacman -S --print <pkg>~
+
+
+** 9. Pacman Tricks
+- Check which package owns a file: ~pacman -Qo /usr/bin/vim~
+- List files installed by package: ~pacman -Ql vim~
+- Remove orphans (safe cleanup): ~sudo pacman -Rns $(pacman -Qdtq)~
+- Upgrade system except one package: ~sudo pacman -Syu --ignore=linux~
+
+
+** 10. Pacman Alternatives & Helpers
+- *yay / paru* → Extend pacman for *AUR* packages.
+- Syntax stays same as pacman but supports AUR.
+
+Example with yay:
+#+BEGIN_SRC bash
+yay -S google-chrome
+yay -Rns google-chrome
+#+END_SRC
+
+
+** 11. Pacman Workflow for a New Arch Install
+#+BEGIN_SRC bash
+# Step 1: Update system
+sudo pacman -Syu
+
+# Step 2: Install base packages
+sudo pacman -S base-devel git
+
+# Step 3: Enable multilib (edit /etc/pacman.conf)
+# Uncomment:
+# [multilib]
+# Include = /etc/pacman.d/mirrorlist
+
+# Step 4: Install desktop, drivers, apps
+sudo pacman -S xorg plasma firefox
+#+END_SRC
+
+
+** 12. Pacman Recovery
+- If pacman breaks:
+  - Use *chroot* from Arch ISO:
+#+BEGIN_SRC bash
+arch-chroot /mnt
+pacman -Syu
+#+END_SRC
+
+- *Reinstall pacman:* ~pacman -S pacman~
+  
+
+
+
+* Exponents
+
+** *Laws of Exponents*
+
+$\text{Zero Exponent}\qquad a^0=1,\quad a\ne0$
+
+$\text{Negative Exponent}\qquad a^{-n}=\frac{1}{a^n},\quad a\ne0$
+
+$\text{Product Rule}\qquad a^m\cdot a^n = a^{m+n}$
+
+$\text{Quotient Rule}\qquad \frac{a^m}{a^n}=a^{m-n},\quad a\ne0$
+
+$\text{Power of Power}\qquad (a^m)^n=a^{mn}$
+
+$\text{Power of Quotient}\qquad \left(\frac{a}{b}\right)^m=\frac{a^m}{b^m}$
+
+$\text{Fractional Exponent (Roots)}\qquad a^\frac{1}{n}=\sqrt[n]{a},\quad a\ge0$
+
+                                      $a^\frac{m}{n}=\sqrt[n]{a^m}=\left(\sqrt[n]{a}\right)^m$
+                                      
+
+ *Remember with different bases* $2^3\cdot3^3\longrightarrow(2\cdot3)^3=216$
+ 
+
+** Exponents in C
+- *Using* =<math.h>= (=pow()= function).
+- ~double pow(double base, double exponent);~
+- This works for *any real base > 0* and real exponent.
+- Compile with: ~gcc file.c -lm~
+  
+#+BEGIN_SRC C :includes '(<stdio.h> <math.h>)
+printf("2^5 = %f\n", pow(2, 5));
+printf("2^-3 = %f\n", pow(2, -3));
+printf("9^0.5 = %f\n", pow(9, 0.5));
+printf("2^pi = %f\n", pow(2, M_PI)); // requires math.h
+return 0;
+#+END_SRC
+
+ 
+** Implement my own ~pow()~ Function in C
+*** Implement only for positive base and exponent
+**** Naive Method
+- multiply repeatedly *O(N)* time complexity
+- This is *slow for large exponents* → we improve it using *exponentiation by squaring* (fast exponentiation).
+
+#+BEGIN_SRC C :includes '(<stdio.h> <inttypes.h>)
+uint64_t my_pow(uint64_t base, uint64_t exp){
+  uint64_t result = 1;
+  for (int i=0; i<exp; ++i)
+    result *= base;
+  return result;
+}
+
+int main(void){
+  printf("%ld\n", my_pow(7,22));
+  return 0;
+}
+#+END_SRC
+
+**** Recursive Fast Approach
+- Instead of Multiplying /a/ one by one, we use the *binary representation of the exponent*.
+- *Key Property:*
+  - If /n/ is *even*: $a^n = (a^\frac{n}{2})^2$
+  - If /n/ is *odd*: $a^n = a\cdot a^{n-1}$
+- This means we can reduce the problem by about *half* at each step → *logarithmic complexity*.
+- *Time Complexity:* $\text{O}(\log_{2}{n}+1)$
+
+#+BEGIN_SRC C :includes '(<stdio.h> <inttypes.h>)
+uint64_t my_pow(uint64_t base, uint64_t exp){
+  if (exp == 0) return 1;
+  if (exp == 1) return base;
+
+  if (exp % 2 == 0){
+    uint64_t half = my_pow(base, exp/2);
+    return half * half;
+  } else{
+    return base * my_pow(base, exp-1);
+  }
+}
+
+int main(void){
+  printf("%ld\n", my_pow(7,22));
+  return 0;
+}
+#+END_SRC
+
+*Let's visualize it for* $2^7$
+
+*1.* $\text{ret }2\times\text{Pow(}2,6\text{)}$       $\longrightarrow 2\times64=128$
+
+*2.* $\text{half}=\text{Pow(}2,3\text{)}$        $\longleftarrow 8$
+   $\text{ret half}\times\text{half}$          $\longrightarrow 8\times8=64$
+
+*3.* $\text{ret }2\times\text{Pow(}2,2\text{)}$       $\longrightarrow 2\times4=8$
+
+*4.* $\text{half}=\text{Pow(}2,1\text{)}$        $\longleftarrow 2$
+   $\text{ret half}\times\text{half}$          $\longrightarrow 2\times2=4$
+
+*So Total 4 Iterations:* $\text{O}(\log_{2}{7}+1) = 4$
+
+**** Iterative Fast Approach
+- The iterative version uses the *binary expansion* of the exponent.
+- *Time Complexity:* $\text{O}(\log_{2}{n}+1)$
+
+#+BEGIN_SRC C :includes '(<stdio.h> <inttypes.h>)
+  uint64_t my_pow(uint64_t base, uint64_t exp){
+    uint64_t result = 1;
+    while (exp > 0){
+      if (exp & 1)       // bit is 1
+        result *= base;
+      base *= base;
+      exp >>= 1;
+    }
+    return result;
+  }
+
+  int main(void){
+    printf("%ld\n", my_pow(2,13));
+    return 0;
+  }
+#+END_SRC
+
+*So let's see for:* $2^{13}$
+
+$13 = (1101)_{2} = 1\cdot2^3+1\cdot2^2+0\cdot2^1+1\cdot2^0 = 8+4+1$
+
+$2^{13} = 2^{(8+4+1)} = 2^8\cdot2^4\cdot2$
+
+- *So this is what happens in the algorithm*
+- Initially *result = 1* and *base = 2*
+
+| *Bit(exp)* | *result*                 | *base*                  |
+|----------+------------------------+-----------------------|
+|     1101 | result *= base → 2    | base *= base → 4     |
+|      110 | skip                   | base *= base → 16    |
+|       11 | result *= base → 32   | base *= base → 256   |
+|        1 | result *= base → 8192 | base *= base → 65536 |
+
+
+*** Extend it for Negative Exponent
+#+BEGIN_SRC C :includes '(<stdio.h> <inttypes.h>)
+double my_pow(int64_t base, int64_t exp){
+  double result = 1.0;
+  uint64_t modexp = (exp < 0) ? -exp : exp;
+  while (modexp > 0){
+    if (modexp & 1)
+      result *= base;
+    base *= base;
+    modexp >>= 1;
+  }
+  return (exp < 0) ? 1/result : result;
+}
+
+int main(void){
+  printf("%lf\n", my_pow(2,13));
+  printf("%lf\n", my_pow(2,-13));
+  return 0;
+}
+#+END_SRC
+
