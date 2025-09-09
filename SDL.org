@@ -1,0 +1,45 @@
+* SDL
+** SDL Tutorials
+*** 1. Create a Window with Red Background
+
+#+BEGIN_SRC C :includes <SDL2/SDL.h> :flags "-lSDL2"
+  SDL_Init(SDL_INIT_VIDEO);
+
+  SDL_Window *win = SDL_CreateWindow("SDL", SDL_WINDOWPOS_UNDEFINED,
+                                     SDL_WINDOWPOS_UNDEFINED, 720, 540, 0);
+  SDL_Surface *wsf = SDL_GetWindowSurface(win);
+
+  SDL_FillRect(wsf, NULL, SDL_MapRGB(wsf->format, 255, 0, 0));
+  SDL_UpdateWindowSurface(win);
+  SDL_Delay(5000);
+
+  SDL_DestroyWindow(win);
+  SDL_Quit();
+#+END_SRC
+
+*What is SDL_MapRGB?*
+~SDL_MapRGB~ is a helper function in SDL that *converts a color expressed as separate red, green, and blue values*
+*into a single integer (pixel value)* that matches the pixel format of a surface.
+
+Signature: ~Uint32 SDL_MapRGB(const SDL_PixelFormat *format, Uint8 r, Uint8 g, Uint8 b);~
+
+*Why do we need it?*
+- Surfaces (~SDL_Surface~) store pixels in memory according to their *pixel format* (~SDL_PixelFormat~), which describes:
+  - How many bits per pixel (e.g., 16, 24, 32…)
+  - The byte ordering (endianness)
+  - Bitmasks and shifts for each channel (red, green, blue, alpha)
+
+Different systems or surfaces might store pixels differently. For example:
+- A 32-bit pixel could be stored as *ARGB* or *RGBA* or *BGRA* depending on the format.
+- If you naively put *(r << 16) | (g << 8) | b*, it might not match what SDL expects.
+
+~SDL_MapRGB~ takes care of that translation for you, so you can always say /“I want this RGB color”/ and get the correct encoded pixel value for the given surface.
+
+*Visualization*
+Suppose the pixel format is *ARGB8888* (32 bits per pixel, 8 bits each):
+- Red = 255, Green = 0, Blue = 0 → bright red
+- ~SDL_MapRGB(format, 255, 0, 0)~ might produce *0xFFFF0000* internally.
+- But if the format were *BGRA8888*, the same call could produce *0xFF0000FF*.
+
+So the *same RGB request yields different raw values depending on the format.*
+That’s why you always need ~SDL_MapRGB~.

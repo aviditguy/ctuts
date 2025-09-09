@@ -1,0 +1,119 @@
+* Emacs
+
+** Macros
+- A macro in Emacs = a recorded sequence of keystrokes/commands.
+- Useful for repetitive editing tasks (renaming lines, reformatting text, adding prefixes, etc.).
+- Unlike Lisp macros, these are keyboard macros (interactive, no Lisp needed).
+
+*Basic Workflow Example*
+#+BEGIN_SRC js
+  let foo = 5
+  let bar = 10
+  const foobar = foo + bar
+#+END_SRC
+
+We wish to add semicolon at each line's end using macros:
+1. *Start Recording* → *C-x (*                (~kmacro-start-macro~)
+2. *Do Your Command* → *C-e ; C-n*            (~kmacro-end-macro~)
+3. *Stop Recording*  → *C-x )*
+4. *Replay last macro*
+   - Repeat Once: *C-x e*
+   - Repeat multiple times: *C-u 10 C-x e*  or *C-10 C-x e*
+
+To *Repeat till EOF* do like ~C-0 C-x e~
+
+*** Saving Your Macros
+1. *Create Macro*
+2. *Name Your Macro* ~M-x name-last-kbd-macro~
+   - Emacs asks for name, e.g. *add-semicolor*
+   - Use it like ~M-x add-semicolon~ or multiple times ~C-5 M-x add-semicolon~
+3. *Save it Permanently*
+   - *Run*: ~M-x insert-kbd-macro~
+   - Emacs will insert the Lisp definition of the macro into current buffer.
+   - Put that Lisp snippet into you *init.el* and restart emacs
+
+
+** Dired Mode
+*** Starting Dired Mode
+- C-x d
+- M-x dired Ret
+- C-x C-f <dirname>
+
+*** Basic Navigation
+*Inside Dired buffer:*
+- n → next line
+- p → previous line
+- ^ → go up one directory level
+- g → refresh directory listing
+- RET → open the file/directory at point
+
+*** Marking Files
+*You "mark" files, then run commands on them:*
+- m → mark the file at point
+- u → unmark the file
+- U → unmark all
+- t → toggle marks
+- %m → mark files matching a regex
+
+*** File Operations
+*Once files are marked:*
+- C → Copy (dired-do-copy)
+- R → Rename/Move (dired-do-rename)
+- D → Delete (dired-do-delete)
+- Z → Compress/Decompress
+- M → Change file mode/permissions
+- O → Change owner/group
+
+*** Searching and Replacing
+- A → Search in marked files using regex (dired-do-search)
+- Q → Query replace in marked files
+
+So lets say in marked files or current directed file we did Q and want to replace foo → bar
+We have few options available to us when replacing:
+- y → replace this occurrence
+- n → skip this occurrence
+- ! → replace all remaining matches without asking
+- q → quit query replace
+- . → replace this occurrence and stop
+
+*** Shell Commands
+- ! → Run shell command on current file, runs synchronously (Emacs blocks until it finishes)
+- & → Run shell command asynchronously (no blocking)
+- M-! → Run arbitrary shell command (not tied to files)
+- X → Run command on marked files
+
+*Placeholders you can use:*
+- * → all marked files, space-separated
+- %s → the current file at point
+- %t → the list of marked files, quoted (safe for spaces)
+- %u → URL-encoded file names
+- % followed by other letters → different expansions (depends on version)
+
+*** Subdirectory Management
+- i → Insert subdirectory listing inline
+- C-u k → Kill/remove inserted subdirectory listing
+- l → Redisplay current subdirectory
+
+*** File Information
+- d → flag file for deletion
+- x → execute deletions (all flagged files)
+- s → toggle sort order (by name/date)
+
+*** Extra Features
+- + → create a new directory
+- = → compare file at point with another file
+wdired-mode (C-x C-q) → edit filenames directly in the Dired buffer (like renaming in place).
+After editing, press C-c C-c to commit or C-c ESC to abort.
+
+*** Useful Extensions
+If you want more power:
+dired-x: extra Dired commands (enable with (require 'dired-x)).
+peep-dired: preview files as you move in Dired.
+dired-subtree: expand directories inline without opening new buffers.
+all-the-icons-dired: pretty icons for files.
+
+✅ Workflow Example:
+C-x d → open a directory.
+Move to some files and press m to mark them.
+Press R → type destination → move them.
+Press g → refresh view.
